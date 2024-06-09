@@ -1,0 +1,29 @@
+{
+  "name": "cytube-discord-bot",
+  "version": "0.0.1",
+  "description": "Discord bot for notifying text channels about cytube events",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/The-Darkwire/cytube-discord-bot.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/The-Darkwire/cytube-discord-bot/issues"
+  },
+  "homepage": "https://github.com/The-Darkwire/cytube-discord-bot#readme",
+  "dependencies": {
+    "cytube-client": "^1.2.6",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "ts-node": "^10.9.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
