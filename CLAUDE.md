@@ -5,9 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 - `npm run start` — runs `tsx index.ts` (no build step; TypeScript is executed directly).
+- `docker compose up --build` — runs the container defined by `Dockerfile` + `compose.yaml`.
 - No test runner or linter is configured. `npm test` is a stub that exits 1.
 
 The process requires a `.env` at the project root with `CYTUBE_CHANNEL`, `DISCORD_TOKEN`, and `DISCORD_CHANNEL_ID` (see `.env.example`).
+
+## Deployment
+
+`.github/workflows/deploy.yml` SSHes into the production droplet on push-to-main and runs `git reset --hard origin/main && docker compose up -d --build` from `/root/cytube-discord-bot`. Requires repo secrets `DEPLOY_HOST` and `DEPLOY_SSH_KEY`. The droplet's `.env` lives at `/root/cytube-discord-bot/.env` (not in git, not in the image — `.dockerignore` excludes it; compose injects it via `env_file:`).
+
+`tsx` is intentionally in `dependencies` (not `devDependencies`) because the container runs TypeScript at runtime; `npm ci --omit=dev` in the Dockerfile would otherwise strip it. `typescript` itself is a devDep — tsx uses esbuild, not tsc, at runtime.
 
 ## Architecture
 
