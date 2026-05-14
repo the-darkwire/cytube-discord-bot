@@ -4,7 +4,7 @@
   "description": "Discord bot for notifying text channels about cytube events",
   "main": "index.js",
   "scripts": {
-    "start": "ts-node index.ts",
+    "start": "tsx index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -20,10 +20,10 @@
   "dependencies": {
     "cytube-client": "^1.2.6",
     "discord.js": "^14.26.4",
-    "dotenv": "^17.4.2",
-    "ts-node": "^10.9.2"
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "tsx": "^4.22.0",
+    "typescript": "^6.0.3"
   }
 }

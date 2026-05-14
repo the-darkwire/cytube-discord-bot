@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- `npm run start` — runs `ts-node index.ts` (no build step; TypeScript is executed directly).
+- `npm run start` — runs `tsx index.ts` (no build step; TypeScript is executed directly).
 - No test runner or linter is configured. `npm test` is a stub that exits 1.
 
 The process requires a `.env` at the project root with `CYTUBE_CHANNEL`, `DISCORD_TOKEN`, and `DISCORD_CHANNEL_ID` (see `.env.example`).

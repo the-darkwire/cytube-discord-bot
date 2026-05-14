@@ -2,19 +2,15 @@
   "compilerOptions": {
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
-    "baseUrl": "./",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "jsx": "react-native",
     "lib": ["ESNext"],
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "Preserve",
+    "moduleResolution": "bundler",
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
-    "paths": {
-      "@config/*": ["config/*"]
-    },
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
