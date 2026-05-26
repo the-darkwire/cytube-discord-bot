@@ -1,6 +1,6 @@
 {
   "name": "cytube-discord-bot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Discord bot for notifying text channels about cytube events",
   "main": "index.js",
   "scripts": {
