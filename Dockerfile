@@ -20,6 +20,10 @@ RUN --mount=type=bind,source=package.json,target=package.json \
     pnpm config set store-dir /pnpm-store && \
     pnpm install --prod --frozen-lockfile
 
+# Create the data dir owned by `node` before switching users — the JSON subscription store
+# lives here, mounted as a named volume so it survives container rebuilds.
+RUN mkdir -p /usr/src/app/data && chown -R node:node /usr/src/app/data
+
 USER node
 
 COPY . .

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx index.ts",
     "start": "tsx index.ts",
+    "deploy-commands": "tsx src/deploy-commands.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
