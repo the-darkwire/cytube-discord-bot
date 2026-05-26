@@ -4,7 +4,7 @@ A multi-tenant Discord bot that forwards CyTube media-change events into Discord
 
 ## Server Owners
 
-Want the bot in your Discord server?
+Want the bot in your Discord server? **[→ Invite cytube-bot](https://discord.com/api/oauth2/authorize?client_id=1249189441700892724&scope=bot+applications.commands&permissions=2147486720)**
 
 **What it does once installed:**
 
@@ -21,9 +21,8 @@ Invite scopes: `bot` + `applications.commands`. The bot is configured with only 
 
 **Setup checklist:**
 
-1. Ask the bot operator to send you the bot's invite URL (or [create your own Discord application + bot](https://discord.com/developers/applications) if you're self-hosting).
-2. Invite the bot to your server.
-3. Run the slash commands in any text channel (see the command reference below).
+1. Click the invite link above and pick a server you administer.
+2. Run the slash commands in any text channel (see the command reference below).
 
 `/cytube subscribe` and `/cytube unsubscribe` require the **Manage Server** permission. `/cytube list` is available to everyone.
 
