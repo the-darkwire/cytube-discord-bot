@@ -5,4 +5,9 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
+    volumes:
+      - cytube-data:/usr/src/app/data
     restart: unless-stopped
+
+volumes:
+  cytube-data:
