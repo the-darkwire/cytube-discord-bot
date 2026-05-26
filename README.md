@@ -1,6 +1,6 @@
 # cytube-discord-bot
 
-A multi-tenant Discord bot that forwards CyTube media-change events into Discord text channels. Server admins bind a Discord channel to a CyTube channel via a slash command; the bot does the rest. One deployment handles any number of Discord servers.
+A multi-tenant Discord bot that forwards CyTube media-change events into Discord text channels. Server admins bind any number of Discord channels to any number of CyTube rooms via a `/cytube` slash command; the bot does the rest. One deployment handles any number of Discord servers.
 
 ## Server Owners
 
@@ -8,8 +8,8 @@ Want the bot in your Discord server?
 
 **What it does once installed:**
 
-- Posts a message in whichever Discord text channel you subscribe, every time the linked CyTube channel changes media (e.g. a new YouTube video starts).
-- Supports any number of (CyTube channel → Discord channel) pairs across any number of Discord servers.
+- Posts a message in whichever Discord text channel you subscribe, every time the linked CyTube room changes media (e.g. a new YouTube video starts).
+- Supports many-to-many: one Discord channel can follow several CyTube rooms; one CyTube room can fan out to several Discord channels (even across servers).
 
 **Required Discord bot permissions:**
 
@@ -23,17 +23,29 @@ Invite scopes: `bot` + `applications.commands`. The bot is configured with only 
 
 1. Ask the bot operator to send you the bot's invite URL (or [create your own Discord application + bot](https://discord.com/developers/applications) if you're self-hosting).
 2. Invite the bot to your server.
-3. In whichever Discord text channel you want CyTube updates posted, run:
+3. Run the slash commands in any text channel (see the command reference below).
 
-   ```
-   /cytube subscribe channel:<your-cytube-channel-name>
-   ```
+`/cytube subscribe` and `/cytube unsubscribe` require the **Manage Server** permission. `/cytube list` is available to everyone.
 
-   Replace `<your-cytube-channel-name>` with the name in the CyTube URL (e.g. for `https://cytu.be/r/myroom`, use `myroom`).
-4. To list current subscriptions in your server: `/cytube list`
-5. To stop forwarding in a channel: `/cytube unsubscribe` (run it in the channel you want to disconnect).
+### Command reference
 
-`/cytube subscribe` and `/cytube unsubscribe` require the **Manage Server** permission, so only admins can change subscriptions. `/cytube list` is available to everyone.
+`room:` is the CyTube room name — the bit after `/r/` in the CyTube URL (e.g. for `https://cytu.be/r/myroom`, use `myroom`). `channel:` is a Discord channel picker.
+
+```
+/cytube subscribe   room:<name> [channel:<#discord-channel>]
+/cytube unsubscribe [room:<name>] [channel:<#discord-channel>]
+/cytube list
+```
+
+**`/cytube subscribe`** — binds a CyTube room to a Discord channel. If `channel:` is omitted, the current channel is used. Idempotent: subscribing to a room you're already subscribed to is a no-op.
+
+**`/cytube unsubscribe`** — three flavors:
+
+- With both `room:` and `channel:` — removes that exact subscription.
+- With only `room:` — removes that room's subscription in the current channel.
+- With only `channel:` (or no args) — removes the single subscription in that channel; if the channel has multiple, the bot replies with a list and an "Unsubscribe all N" button to confirm.
+
+**`/cytube list`** — shows every subscription in the current server.
 
 ## Install the server (for operators)
 

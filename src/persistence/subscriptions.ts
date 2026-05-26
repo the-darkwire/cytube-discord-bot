@@ -51,37 +51,42 @@ export const getByGuild = (guildId: string): Subscription[] =>
 export const getByCytubeChannel = (cytubeChannel: string): Subscription[] =>
   cache.subscriptions.filter((s) => s.cytubeChannel === cytubeChannel);
 
-export const findByChannel = (discordChannelId: string): Subscription | undefined =>
-  cache.subscriptions.find((s) => s.discordChannelId === discordChannelId);
+export const getByChannel = (discordChannelId: string): Subscription[] =>
+  cache.subscriptions.filter((s) => s.discordChannelId === discordChannelId);
 
-type AddResult = { added: boolean; replaced?: Subscription };
-
-export const add = (sub: Subscription): AddResult => {
-  const existing = findByChannel(sub.discordChannelId);
-  if (existing) {
-    if (existing.cytubeChannel === sub.cytubeChannel) {
-      return { added: false };
-    }
-    cache.subscriptions = cache.subscriptions.filter(
-      (s) => s.discordChannelId !== sub.discordChannelId,
-    );
-    cache.subscriptions.push(sub);
-    persist(cache);
-    return { added: true, replaced: existing };
-  }
+export const add = (sub: Subscription): { added: boolean } => {
+  const exists = cache.subscriptions.some(
+    (s) => s.discordChannelId === sub.discordChannelId && s.cytubeChannel === sub.cytubeChannel,
+  );
+  if (exists) return { added: false };
   cache.subscriptions.push(sub);
   persist(cache);
   return { added: true };
 };
 
-export const remove = (discordChannelId: string): Subscription | undefined => {
-  const existing = findByChannel(discordChannelId);
+export const removeOne = (
+  discordChannelId: string,
+  cytubeChannel: string,
+): Subscription | undefined => {
+  const existing = cache.subscriptions.find(
+    (s) => s.discordChannelId === discordChannelId && s.cytubeChannel === cytubeChannel,
+  );
   if (!existing) return undefined;
+  cache.subscriptions = cache.subscriptions.filter(
+    (s) => !(s.discordChannelId === discordChannelId && s.cytubeChannel === cytubeChannel),
+  );
+  persist(cache);
+  return existing;
+};
+
+export const removeAllForChannel = (discordChannelId: string): Subscription[] => {
+  const removed = cache.subscriptions.filter((s) => s.discordChannelId === discordChannelId);
+  if (removed.length === 0) return [];
   cache.subscriptions = cache.subscriptions.filter(
     (s) => s.discordChannelId !== discordChannelId,
   );
   persist(cache);
-  return existing;
+  return removed;
 };
 
 export const uniqueCytubeChannels = (): string[] =>

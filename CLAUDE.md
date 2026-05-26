@@ -6,7 +6,11 @@ Org-wide conventions (toolchain, script vocabulary, style, deploy patterns, Node
 
 ## What this is
 
-A multi-tenant Discord bot that forwards CyTube media-change events into Discord text channels. Discord server admins use `/cytube subscribe <channel>` to bind a Discord text channel to a CyTube channel; the bot opens one CyTube connection per unique channel and fans out media-change events to all subscribed Discord channels.
+A multi-tenant Discord bot that forwards CyTube media-change events into Discord text channels. Discord server admins use `/cytube subscribe room:<name>` to bind a Discord channel to a CyTube room; the bot opens one CyTube connection per unique room and fans out media-change events to all subscribed Discord channels.
+
+Many-to-many: one Discord channel can subscribe to multiple CyTube rooms, and one CyTube room can forward to multiple Discord channels across multiple Discord servers. The persistence layer dedupes on `(discordChannelId, cytubeChannel)` pairs, so subscribing to something you're already subscribed to is a no-op.
+
+Naming convention in the slash commands: **`room:`** for the CyTube side (matches CyTube's URL terminology `cytu.be/r/<room>`), **`channel:`** for the Discord side (Discord's term, reinforced by the channel-picker UI).
 
 One deployment serves any number of Discord servers — same model as roggan-bot.
 
@@ -50,19 +54,21 @@ The entry point `index.ts` orchestrates:
    - Calls `subscriptions.init()` to load `data/subscriptions.json` into memory.
    - **Auto-migrates** the legacy env-based single subscription into the JSON store: if the store is empty AND `env.CYTUBE_CHANNEL` + `env.DISCORD_CHANNEL_ID` are set, it seeds one subscription. The env vars are unnecessary after this and can be removed on the next deploy.
    - Calls `cytubeManager.reconcile()` to open a CyTube client for every unique CyTube channel in the store.
-3. On `InteractionCreate`, `src/interaction-router.ts` dispatches to `src/commands/cytube.ts`, which handles `/cytube subscribe | unsubscribe | list`.
+3. On `InteractionCreate`, `src/interaction-router.ts` dispatches:
+   - Chat input commands (`/cytube …`) → `src/commands/cytube.ts` `execute(…)`.
+   - Button clicks whose custom ID starts with `cytube:` → `src/commands/cytube.ts` `handleButton(…)`. Currently only one button exists: the "Unsubscribe all N" confirmation surfaced when `/cytube unsubscribe` is invoked on a channel with multiple subs.
 
 When a CyTube client fires `changeMedia`:
 - `cytubeManager` looks up all `Subscription` rows for that CyTube channel and calls `sendMessage(message, sub.discordChannelId)` for each. Send failures are logged but don't crash the process.
 
 ### Modules
 
-- `src/persistence/subscriptions.ts` — JSON file at `data/subscriptions.json`. In-memory cache; atomic writes via tmp + rename. CRUD helpers: `init`, `getAll`, `getByGuild`, `getByCytubeChannel`, `findByChannel`, `add`, `remove`, `uniqueCytubeChannels`.
-- `src/cytube/manager.ts` — owns the `Map<cytubeChannel, CytubeInstance>`. `reconcile()` opens clients for channels in `uniqueCytubeChannels()` that aren't already running. Idle clients are left running (hobby-scale shortcut; bot restart on deploy resets the world).
+- `src/persistence/subscriptions.ts` — JSON file at `data/subscriptions.json`. In-memory cache; atomic writes via tmp + rename. Dedupe key is `(discordChannelId, cytubeChannel)`. Helpers: `init`, `getAll`, `getByGuild`, `getByCytubeChannel`, `getByChannel`, `add`, `removeOne(channelId, cytubeChannel)`, `removeAllForChannel(channelId)`, `uniqueCytubeChannels`.
+- `src/cytube/manager.ts` — owns the `Map<cytubeChannel, CytubeInstance>`. `reconcile()` opens clients for rooms in `uniqueCytubeChannels()` that aren't already running. Idle clients are left running (hobby-scale shortcut; bot restart on deploy resets the world).
 - `src/discord/sendMessage.ts` — `sendMessage(message, channelID)` looks up the channel in `client.channels.cache` and posts. Throws if the channel isn't cached; callers catch and log.
-- `src/commands/cytube.ts` — `SlashCommandBuilder` def + execute handler for the `/cytube` subcommand tree. Subcommands restricted to members with `ManageGuild` (so random users can't spam-subscribe a channel).
-- `src/interaction-router.ts` — single dispatch point for slash commands (mirrors roggan-bot's pattern).
-- `src/deploy-commands.ts` — one-off script that uploads the slash command definitions to Discord via REST.
+- `src/commands/cytube.ts` — `SlashCommandBuilder` def + `execute(…)` handler for `/cytube` + `handleButton(…)` for the unsubscribe-all confirmation button. Subcommands restricted to members with `ManageGuild`. Slash command options use `room:` for the CyTube room and `channel:` for the Discord channel.
+- `src/interaction-router.ts` — single dispatch point. Routes chat-input commands and button interactions whose custom ID starts with `cytube:`.
+- `src/deploy-commands.ts` — one-off script that uploads the slash command definitions to Discord via REST. **Re-run any time `src/commands/cytube.ts`'s `data` schema changes** (i.e. you add/rename/remove subcommands or options) — internal-only changes don't need it.
 
 ### Notes & gotchas
 
