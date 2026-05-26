@@ -1,4 +1,4 @@
-import { TextChannel } from "discord.js";
+import type { TextChannel } from "discord.js";
 import { client } from ".";
 
 export const sendMessage = (message: string, channelID: string) => {

@@ -4,17 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- `npm run start` — runs `tsx index.ts` (no build step; TypeScript is executed directly).
+Package manager is **pnpm** (the-darkwire org standard). Runtime executor is **tsx** (no build step; `tsconfig.json` has `noEmit: true`).
+
+- `pnpm dev` / `pnpm start` — runs the bot via `tsx index.ts`. Identical commands; `start` is the production entry, `dev` exists for parity with other org repos.
+- `pnpm typecheck` — `tsc --noEmit`. The single most useful feedback loop when editing.
+- `pnpm lint` / `pnpm lint:fix` — Biome lint (read / autofix).
+- `pnpm format` — Biome format (write).
+- `pnpm check` — Biome combined lint + format (write).
+- `pnpm test` / `pnpm test:watch` — Vitest. Currently only a smoke test exists.
 - `docker compose up --build` — runs the container defined by `Dockerfile` + `compose.yaml`.
-- No test runner or linter is configured. `npm test` is a stub that exits 1.
 
 The process requires a `.env` at the project root with `CYTUBE_CHANNEL`, `DISCORD_TOKEN`, and `DISCORD_CHANNEL_ID` (see `.env.example`).
+
+Style is enforced by `biome.json` at the repo root (org-wide convention): double quotes, semicolons, trailing commas everywhere, 2-space indent, 100-char lines, organized imports. Run `pnpm check` to autofix everything in one shot.
 
 ## Deployment
 
 `.github/workflows/deploy.yml` SSHes into the production droplet on push-to-main and runs `git reset --hard origin/main && docker compose up -d --build` from `/root/cytube-discord-bot`. Requires repo secrets `DEPLOY_HOST` and `DEPLOY_SSH_KEY`. The droplet's `.env` lives at `/root/cytube-discord-bot/.env` (not in git, not in the image — `.dockerignore` excludes it; compose injects it via `env_file:`).
 
-`tsx` is intentionally in `dependencies` (not `devDependencies`) because the container runs TypeScript at runtime; `npm ci --omit=dev` in the Dockerfile would otherwise strip it. `typescript` itself is a devDep — tsx uses esbuild, not tsc, at runtime.
+`tsx` is intentionally in `dependencies` (not `devDependencies`) because the container runs TypeScript at runtime; `pnpm install --prod --frozen-lockfile` in the Dockerfile would otherwise strip it. `typescript` itself is a devDep — tsx uses esbuild, not tsc, at runtime.
 
 ## Architecture
 

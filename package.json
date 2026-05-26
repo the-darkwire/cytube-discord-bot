@@ -4,8 +4,15 @@
   "description": "Discord bot for notifying text channels about cytube events",
   "main": "index.js",
   "scripts": {
+    "dev": "tsx index.ts",
     "start": "tsx index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "repository": {
     "type": "git",
@@ -24,6 +31,14 @@
     "tsx": "^4.22.0"
   },
   "devDependencies": {
-    "typescript": "^6.0.3"
-  }
+    "@biomejs/biome": "^2.0.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@11.3.0"
 }

@@ -1,10 +1,10 @@
-import { client as DiscordClient } from "./src/discord";
-import { createCytubeClient } from "./src/cytube";
 import { Events } from "discord.js";
-import { sendMessage } from "./src/discord/sendMessage";
 import { env } from "./src/config";
+import { createCytubeClient } from "./src/cytube";
+import { client as DiscordClient } from "./src/discord";
+import { sendMessage } from "./src/discord/sendMessage";
 
-DiscordClient.once(Events.ClientReady, async (readyDiscordClient) => {
+DiscordClient.once(Events.ClientReady, async () => {
   if (!env.DISCORD_CHANNEL_ID) return;
 
   const sendMessageToTestChannel = (message: string) =>
@@ -12,7 +12,8 @@ DiscordClient.once(Events.ClientReady, async (readyDiscordClient) => {
 
   const CytubeClient = await createCytubeClient();
 
+  // biome-ignore lint/suspicious/noExplicitAny: cytube-client ships no types (see CLAUDE.md).
   CytubeClient.on("changeMedia", (data: any) =>
-    sendMessageToTestChannel(`Now playing: ${data.title} [${data.duration}]`)
+    sendMessageToTestChannel(`Now playing: ${data.title} [${data.duration}]`),
   );
 });
