@@ -8,6 +8,8 @@ Org-wide conventions (toolchain, script vocabulary, style, deploy patterns, Node
 
 A multi-tenant Discord bot that forwards CyTube media-change events into Discord text channels. Discord server admins use `/cytube subscribe room:<name>` to bind a Discord channel to a CyTube room; the bot opens one CyTube connection per unique room and fans out media-change events to all subscribed Discord channels.
 
+For each "Now playing" message the bot posts, it also starts a Discord thread under that message and mirrors CyTube chat messages into the thread for the duration of the video. Threads auto-archive after 1h of inactivity. This keeps the chat-mirror out of the parent channel's feed.
+
 Many-to-many: one Discord channel can subscribe to multiple CyTube rooms, and one CyTube room can forward to multiple Discord channels across multiple Discord servers. The persistence layer dedupes on `(discordChannelId, cytubeChannel)` pairs, so subscribing to something you're already subscribed to is a no-op.
 
 Naming convention in the slash commands: **`room:`** for the CyTube side (matches CyTube's URL terminology `cytu.be/r/<room>`), **`channel:`** for the Discord side (Discord's term, reinforced by the channel-picker UI).
@@ -59,15 +61,18 @@ The entry point `index.ts` orchestrates:
    - Button clicks whose custom ID starts with `cytube:` → `src/commands/cytube.ts` `handleButton(…)`. Currently only one button exists: the "Unsubscribe all N" confirmation surfaced when `/cytube unsubscribe` is invoked on a channel with multiple subs.
 
 When a CyTube client fires `changeMedia`:
-- `cytubeManager` looks up all `Subscription` rows for that CyTube channel and calls `sendMessage(message, sub.discordChannelId)` for each. Send failures are logged but don't crash the process.
+- `cytubeManager` looks up all `Subscription` rows for that CyTube channel and calls `sendMessage(message, sub.discordChannelId)` for each. The returned `Message` is used to `startThread()` immediately — the thread becomes the active mirror target for that `(cytubeChannel, discordChannelId)` pair until the next `changeMedia` swaps it out. Failures are logged but don't crash the process.
+
+When a CyTube client fires `chatMsg`:
+- `cytubeManager` looks up the active thread per subscriber and forwards `**<username>**: <msg>` into it. Messages are HTML-sanitized (CyTube emits HTML; Discord expects plain text/markdown). Server announcements (`username === "[server]"`) and shadow-banned messages (`meta.shadow`) are filtered out.
 
 ### Modules
 
 - `src/persistence/subscriptions.ts` — JSON file at `data/subscriptions.json`. In-memory cache; atomic writes via tmp + rename. Dedupe key is `(discordChannelId, cytubeChannel)`. Helpers: `init`, `getAll`, `getByGuild`, `getByCytubeChannel`, `getByChannel`, `add`, `removeOne(channelId, cytubeChannel)`, `removeAllForChannel(channelId)`, `uniqueCytubeChannels`.
-- `src/cytube/manager.ts` — owns the `Map<cytubeChannel, CytubeInstance>`. `reconcile()` opens clients for rooms in `uniqueCytubeChannels()` that aren't already running. Idle clients are left running (hobby-scale shortcut; bot restart on deploy resets the world).
-- `src/discord/sendMessage.ts` — `sendMessage(message, channelID)` looks up the channel in `client.channels.cache` and posts. Throws if the channel isn't cached; callers catch and log.
+- `src/cytube/manager.ts` — owns the `Map<cytubeChannel, CytubeInstance>` plus the `activeThreads` map keyed by `${cytubeChannel}:${discordChannelId}`. Wires `changeMedia` (post + start thread) and `chatMsg` (mirror to thread) handlers per client. `reconcile()` opens clients for rooms in `uniqueCytubeChannels()` that aren't already running. Idle clients are left running (hobby-scale shortcut; bot restart on deploy resets the world).
+- `src/discord/sendMessage.ts` — `sendMessage(message, channelID)` looks up the channel in `client.channels.cache`, posts, and **returns the sent `Message`** so callers can `startThread()` on it. Throws if the channel isn't cached; callers catch and log.
 - `src/commands/cytube.ts` — `SlashCommandBuilder` def + `execute(…)` handler for `/cytube` + `handleButton(…)` for the unsubscribe-all confirmation button. Subcommands restricted to members with `ManageGuild`. Slash command options use `room:` for the CyTube room and `channel:` for the Discord channel.
-- `src/interaction-router.ts` — single dispatch point. Routes chat-input commands and button interactions whose custom ID starts with `cytube:`.
+- `src/interaction-router.ts` — single dispatch point. Routes chat-input commands and button interactions whose custom ID starts with `cytube:`. Wrapped in a top-level try/catch — discord.js emits an 'error' event on the Client when an interaction handler throws (most common cause: the 3-second interaction token expired before we replied), and an unhandled 'error' event would crash the process. Errors here are logged and swallowed.
 - `src/deploy-commands.ts` — one-off script that uploads the slash command definitions to Discord via REST. **Re-run any time `src/commands/cytube.ts`'s `data` schema changes** (i.e. you add/rename/remove subcommands or options) — internal-only changes don't need it.
 
 ### Notes & gotchas
