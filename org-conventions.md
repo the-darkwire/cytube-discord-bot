@@ -7,9 +7,9 @@ The-Darkwire's shared TypeScript toolchain. All org repos follow these to minimi
 - **Language**: TypeScript (all repos)
 - **Package manager**: pnpm (`packageManager` field pinned in `package.json`)
 - **Linter/formatter**: Biome (`biome.json` at repo root, copied from the canon)
-- **Type checking**: `tsc --noEmit` (no build step for runnable repos that use tsx/Vite/Metro/etc.)
+- **Type checking**: `tsc --noEmit` (no build step for runnable repos that use tsx/Bun/Vite/Metro/etc.)
 - **Tests**: Vitest (every repo ships at minimum a smoke test so `pnpm test` exits 0)
-- **Node**: pinned via `.nvmrc`, kept in sync with Dockerfile / CI matrix
+- **Node**: pinned via `.nvmrc`, kept in sync with Dockerfile / CI matrix. Repos that use **Bun** as the runtime (e.g. the `elysia-stack` template) pin Bun via `engines.bun` in `package.json` instead and do not have `.nvmrc`. **pnpm remains the package manager regardless of runtime** — Bun's resolver handles pnpm-installed `node_modules` cleanly.
 
 ## Standardized script vocabulary
 
