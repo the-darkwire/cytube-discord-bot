@@ -9,14 +9,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/The-Darkwire/cytube-discord-bot.git"
+    "url": "git+ssh://git@github.com/the-darkwire/cytube-discord-bot.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/The-Darkwire/cytube-discord-bot/issues"
+    "url": "https://github.com/the-darkwire/cytube-discord-bot/issues"
   },
-  "homepage": "https://github.com/The-Darkwire/cytube-discord-bot#readme",
+  "homepage": "https://github.com/the-darkwire/cytube-discord-bot#readme",
   "dependencies": {
     "cytube-client": "^1.2.6",
     "discord.js": "^14.26.4",

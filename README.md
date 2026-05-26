@@ -11,7 +11,7 @@ Ensure NodeJS is configured to run in your environment: https://nodejs.org/en
 Clone the repository:
 
 ```
-git clone git@github.com:The-Darkwire/cytube-discord-bot.git
+git clone git@github.com:the-darkwire/cytube-discord-bot.git
 ```
 
 Change into the repository directory:
