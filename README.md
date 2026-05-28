@@ -9,7 +9,6 @@ Want the bot in your Discord server? **[→ Invite cytube-bot](https://discord.c
 **What it does once installed:**
 
 - Posts a message in whichever Discord text channel you subscribe, every time the linked CyTube room changes media (e.g. a new YouTube video starts).
-- Starts a thread under each "Now playing" message and mirrors the CyTube chat into it for as long as the video plays. Discussion stays out of the main channel feed.
 - Supports many-to-many: one Discord channel can follow several CyTube rooms; one CyTube room can fan out to several Discord channels (even across servers).
 
 **Required Discord bot permissions:**
