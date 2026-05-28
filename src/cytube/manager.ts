@@ -13,7 +13,7 @@ const handleChangeMedia =
   async (data: any) => {
     const title = String(data.title ?? "Unknown");
     const duration = String(data.duration ?? "");
-    const message = `Now playing on **[${cytubeChannel}](<https://cytu.be/r/${cytubeChannel}>)**: ${title} [${duration}]`;
+    const message = `Now playing on **[${cytubeChannel}](<https://cytu.be/r/${cytubeChannel}>)**: **${title}** [${duration}]`;
     const subs = subscriptions.getByCytubeChannel(cytubeChannel);
     for (const sub of subs) {
       try {
