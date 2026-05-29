@@ -16,6 +16,10 @@ const rest = new REST({ version: "10" }).setToken(env.DISCORD_TOKEN);
       body: commands,
     })) as unknown[];
     console.log(`Reloaded ${data.length} application (/) command(s).`);
+    // Importing `data` from src/commands/cytube transitively pulls in src/discord/index.ts,
+    // which opens a gateway connection at module load. Without an explicit exit, that
+    // connection keeps the event loop alive forever and the script hangs.
+    process.exit(0);
   } catch (error) {
     console.error(error);
     process.exit(1);
