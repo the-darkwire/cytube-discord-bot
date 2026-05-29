@@ -10,7 +10,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - name: SSH into droplet and redeploy
@@ -25,4 +40,5 @@ jobs:
             git fetch --prune origin
             git reset --hard origin/main
             docker compose up -d --build
+            docker compose run --rm bot pnpm deploy-commands
             docker image prune -f
