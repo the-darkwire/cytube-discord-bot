@@ -39,6 +39,11 @@ jobs:
             cd /root/cytube-discord-bot
             git fetch --prune origin
             git reset --hard origin/main
+            # Clean up any orphan one-shot containers (e.g. a previous deploy that was
+            # cancelled mid-run and left a hung `docker compose run` behind).
+            docker ps -aq --filter "label=com.docker.compose.oneoff=True" \
+              --filter "label=com.docker.compose.project=cytube-discord-bot" \
+              | xargs -r docker rm -f
             docker compose up -d --build
-            docker compose run --rm bot pnpm deploy-commands
+            timeout 60 docker compose run --rm bot pnpm deploy-commands
             docker image prune -f
