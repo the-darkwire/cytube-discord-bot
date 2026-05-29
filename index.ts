@@ -36,3 +36,20 @@ DiscordClient.once(Events.ClientReady, async () => {
 });
 
 DiscordClient.on(Events.InteractionCreate, routeInteraction);
+
+let shuttingDown = false;
+const shutdown = async (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] received ${signal}, closing CyTube and Discord clients...`);
+  try {
+    cytubeManager.shutdown();
+    await DiscordClient.destroy();
+  } catch (err) {
+    console.error("[shutdown] error during shutdown:", err);
+  }
+  process.exit(0);
+};
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

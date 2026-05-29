@@ -45,3 +45,18 @@ export const reconcile = async () => {
     if (!clients.has(ch)) await startClient(ch);
   }
 };
+
+// Close every active CyTube WebSocket so the server can free its connection slots immediately
+// instead of waiting for timeout. cytube-client wraps socket.io; either close() or disconnect()
+// is available depending on the version, so we probe both.
+export const shutdown = () => {
+  for (const [ch, instance] of clients.entries()) {
+    try {
+      if (typeof instance.close === "function") instance.close();
+      else if (typeof instance.disconnect === "function") instance.disconnect();
+    } catch (err) {
+      console.error(`[cytube] error closing ${ch}:`, err);
+    }
+  }
+  clients.clear();
+};
