@@ -24,12 +24,27 @@ const handleChangeMedia =
     }
   };
 
+// cytube-client fires `changeMedia` once on connect with the room's current media (so the
+// client can render initial state). Treating that as a real change means we repost the current
+// video into Discord on every bot restart. Suppress any changeMedia event within this window
+// of opening the connection — real videos are minutes apart, so we lose nothing.
+const INITIAL_STATE_SUPPRESS_WINDOW_MS = 5_000;
+
 const startClient = async (cytubeChannel: string) => {
   if (clients.has(cytubeChannel)) return;
   console.log(`[cytube] connecting to ${cytubeChannel}`);
   try {
     const instance: CytubeInstance = await CytubeClient.connect(cytubeChannel);
-    instance.on("changeMedia", handleChangeMedia(cytubeChannel));
+    const connectedAt = Date.now();
+    const handler = handleChangeMedia(cytubeChannel);
+    // biome-ignore lint/suspicious/noExplicitAny: cytube-client event payload is untyped.
+    instance.on("changeMedia", async (data: any) => {
+      if (Date.now() - connectedAt < INITIAL_STATE_SUPPRESS_WINDOW_MS) {
+        console.log(`[cytube] ${cytubeChannel} suppressing initial-state changeMedia event`);
+        return;
+      }
+      await handler(data);
+    });
     clients.set(cytubeChannel, instance);
   } catch (err) {
     console.error(`[cytube] failed to connect to ${cytubeChannel}:`, err);
