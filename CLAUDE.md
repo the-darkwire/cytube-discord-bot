@@ -21,11 +21,11 @@ One deployment serves any number of Discord servers — same model as roggan-bot
 Package manager is **pnpm** (the-darkwire org standard). Runtime executor is **tsx** (no build step; `tsconfig.json` has `noEmit: true`).
 
 - `pnpm dev` / `pnpm start` — runs the bot via `tsx index.ts`. Identical commands.
-- `pnpm deploy-commands` — registers the `/cytube` slash command globally with Discord. Run once after first deploy, and again any time `src/commands/cytube.ts` `data` changes (i.e. add/rename/remove subcommands or options). Reads `DISCORD_TOKEN` + `DISCORD_CLIENT_ID` from env; does not require the bot to be running.
+- `pnpm deploy-commands` — registers the `/cytube` slash command globally with Discord. The deploy workflow runs this automatically on push to `main` (one-shot `docker compose run --rm bot pnpm deploy-commands` after the rebuild), so you only need to invoke it manually when iterating on the `data` schema locally before merging. Reads `DISCORD_TOKEN` + `DISCORD_CLIENT_ID` from env.
 - `pnpm typecheck` — `tsc --noEmit`. The single most useful feedback loop when editing.
 - `pnpm lint` / `pnpm lint:fix` — Biome lint (read / autofix).
 - `pnpm check` — Biome combined lint + format (write).
-- `pnpm test` — Vitest smoke test.
+- `pnpm test` / `pnpm test:watch` — Vitest. Covers the subscriptions persistence module end-to-end (add/dedupe/remove/filtering/atomic-write, against a fresh temp DATA_DIR per test). The CyTube manager and the Discord-side handlers are not covered — mocking `cytube-client` (untyped) and Discord interactions is high-effort/low-ROI.
 - `docker compose up --build` — runs the container defined by `Dockerfile` + `compose.yaml`.
 
 ## Env
@@ -66,7 +66,7 @@ When a CyTube client fires `changeMedia`:
 ### Modules
 
 - `src/persistence/subscriptions.ts` — JSON file at `data/subscriptions.json`. In-memory cache; atomic writes via tmp + rename. Dedupe key is `(discordChannelId, cytubeChannel)`. Helpers: `init`, `getAll`, `getByGuild`, `getByCytubeChannel`, `getByChannel`, `add`, `removeOne(channelId, cytubeChannel)`, `removeAllForChannel(channelId)`, `uniqueCytubeChannels`.
-- `src/cytube/manager.ts` — owns the `Map<cytubeChannel, CytubeInstance>`. Wires a `changeMedia` handler per client that posts "Now playing" to all subscribers. `reconcile()` opens clients for rooms in `uniqueCytubeChannels()` that aren't already running. Idle clients are left running (hobby-scale shortcut; bot restart on deploy resets the world).
+- `src/cytube/manager.ts` — owns the `Map<cytubeChannel, CytubeInstance>`. Wires a `changeMedia` handler per client that posts "Now playing" to all subscribers. `reconcile()` opens clients for rooms in `uniqueCytubeChannels()` that aren't already running. Idle clients are left running (hobby-scale shortcut; bot restart on deploy resets the world). `shutdown()` closes every active connection — called from the SIGTERM/SIGINT handler in `index.ts` so server-side CyTube connection slots free immediately on deploy rather than waiting for socket timeouts.
 - `src/discord/sendMessage.ts` — `sendMessage(message, channelID)` looks up the channel in `client.channels.cache` and posts. Throws if the channel isn't cached; callers catch and log.
 - `src/commands/cytube.ts` — `SlashCommandBuilder` def + `execute(…)` handler for `/cytube` + `handleButton(…)` for the unsubscribe-all confirmation button. Subcommands restricted to members with `ManageGuild`. Slash command options use `room:` for the CyTube room and `channel:` for the Discord channel.
 - `src/interaction-router.ts` — single dispatch point. Routes chat-input commands and button interactions whose custom ID starts with `cytube:`. Wrapped in a top-level try/catch — discord.js emits an 'error' event on the Client when an interaction handler throws (most common cause: the 3-second interaction token expired before we replied), and an unhandled 'error' event would crash the process. Errors here are logged and swallowed.
@@ -77,11 +77,13 @@ When a CyTube client fires `changeMedia`:
 - **`cytube-client` ships no types.** `cytube-client.d.ts` is a stub declaring it as `any`. Event payloads (e.g. `data` in the `changeMedia` handler) are untyped; treat them as `any` and consult the cytube-client docs for shape.
 - **`src/config/index.ts` calls `dotenv.config()` at import.** Anything that reads env vars should import `env` from there so dotenv is guaranteed to have run.
 - **The cache lookup in `sendMessage` only works because calls happen after `ClientReady`** — moving them earlier returns `undefined`. The Discord client has only `GatewayIntentBits.Guilds`; new features needing message content / members require additional intents AND matching changes in the Discord Developer Portal.
-- **Slash command registration is a separate one-time concern.** The bot runtime doesn't register slash commands; `pnpm deploy-commands` does. After a definition change in `src/commands/cytube.ts`, re-run `deploy-commands` or the new options won't appear in Discord.
+- **Slash command registration is a separate one-time concern.** The bot runtime doesn't register slash commands; `pnpm deploy-commands` does. The deploy workflow runs it automatically on push to `main`, so post-merge you don't need to do anything. For local pre-merge testing, run `pnpm deploy-commands` yourself.
 
 ## Deployment
 
-`.github/workflows/deploy.yml` SSHes into the production droplet on push-to-main and runs `git reset --hard origin/main && docker compose up -d --build` from `/root/cytube-discord-bot`. Requires repo secrets `DEPLOY_HOST` and `DEPLOY_SSH_KEY`. The droplet's `.env` lives at `/root/cytube-discord-bot/.env` (not in git, not in the image — `.dockerignore` excludes it; compose injects it via `env_file:`).
+`.github/workflows/deploy.yml` runs on push to main: a `verify` job (install/typecheck/lint/test) gates a `deploy` job that SSHes into the production droplet, runs `git reset --hard origin/main && docker compose up -d --build && docker compose run --rm bot pnpm deploy-commands` from `/root/cytube-discord-bot`, then prunes old images. Requires repo secrets `DEPLOY_HOST` and `DEPLOY_SSH_KEY`. The droplet's `.env` lives at `/root/cytube-discord-bot/.env` (not in git, not in the image — `.dockerignore` excludes it; compose injects it via `env_file:`).
+
+On `SIGTERM`/`SIGINT` (e.g. `docker compose down`, container stop, redeploy), `index.ts` closes every CyTube WebSocket and destroys the Discord client before exiting. This avoids leaving phantom server-side connections that can rate-limit reconnects when several rooms come back at once on the next deploy.
 
 The subscription store (`data/subscriptions.json`) lives in a named Docker volume (`cytube-data`), declared in `compose.yaml`. Volume contents persist across `docker compose up --build`; only `docker volume rm cytube-data` will wipe them.
 

@@ -16,8 +16,8 @@ Want the bot in your Discord server? **[→ Invite cytube-bot](https://discord.c
 - View Channels
 - Send Messages
 - Use Application Commands
-- Create Public Threads
-- Send Messages in Threads
+
+The invite link also requests `Create Public Threads` and `Send Messages in Threads`. These powered a per-video chat-mirror feature that's currently disabled but may return; keeping them in the invite avoids the need to re-invite the bot to grant them later. They are unused by the bot today.
 
 Invite scopes: `bot` + `applications.commands`. The bot is configured with only the `Guilds` gateway intent — no privileged intents like `Message Content` or `Server Members`.
 
