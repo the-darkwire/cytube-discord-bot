@@ -25,7 +25,7 @@ Package manager is **pnpm** (the-darkwire org standard). Runtime executor is **t
 - `pnpm typecheck` — `tsc --noEmit`. The single most useful feedback loop when editing.
 - `pnpm lint` / `pnpm lint:fix` — Biome lint (read / autofix).
 - `pnpm check` — Biome combined lint + format (write).
-- `pnpm test` / `pnpm test:watch` — Vitest. Covers the subscriptions persistence module end-to-end (add/dedupe/remove/filtering/atomic-write, against a fresh temp DATA_DIR per test). The CyTube manager and the Discord-side handlers are not covered — mocking `cytube-client` (untyped) and Discord interactions is high-effort/low-ROI.
+- `pnpm test` / `pnpm test:watch` — Vitest. Covers the subscriptions persistence module end-to-end (add/dedupe/remove/filtering/atomic-write, against a fresh temp DATA_DIR per test) and the CyTube manager's connection supervision (backoff, watchdog rebuilds, socket lifecycle handlers, shutdown) against a mocked `cytube-client` and fake timers. The Discord-side interaction handlers are still uncovered — mocking Discord interactions is high-effort/low-ROI.
 - `docker compose up --build` — runs the container defined by `Dockerfile` + `compose.yaml`.
 
 ## Env
@@ -66,7 +66,7 @@ When a CyTube client fires `changeMedia`:
 ### Modules
 
 - `src/persistence/subscriptions.ts` — JSON file at `data/subscriptions.json`. In-memory cache; atomic writes via tmp + rename. Dedupe key is `(discordChannelId, cytubeChannel)`. Helpers: `init`, `getAll`, `getByGuild`, `getByCytubeChannel`, `getByChannel`, `add`, `removeOne(channelId, cytubeChannel)`, `removeAllForChannel(channelId)`, `uniqueCytubeChannels`.
-- `src/cytube/manager.ts` — owns the `Map<cytubeChannel, CytubeInstance>`. Wires a `changeMedia` handler per client that posts "Now playing" to all subscribers. `reconcile()` opens clients for rooms in `uniqueCytubeChannels()` that aren't already running. Idle clients are left running (hobby-scale shortcut; bot restart on deploy resets the world). `shutdown()` closes every active connection — called from the SIGTERM/SIGINT handler in `index.ts` so server-side CyTube connection slots free immediately on deploy rather than waiting for socket timeouts.
+- `src/cytube/manager.ts` — owns `Map<cytubeChannel, Entry>`, where an `Entry` wraps the client plus its supervision state (`retiring`, `lastConnectedAt`, `attempt`). Wires a `changeMedia` handler per client that posts "Now playing" to all subscribers. `reconcile()` opens clients for rooms in `uniqueCytubeChannels()` that aren't already running, and starts the watchdog. `shutdown()` closes every active connection and cancels queued rebuilds — called from the SIGTERM/SIGINT handler in `index.ts` so server-side CyTube connection slots free immediately on deploy rather than waiting for socket timeouts. **Self-healing (see §CyTube connection supervision).**
 - `src/discord/sendMessage.ts` — `sendMessage(message, channelID)` looks up the channel in `client.channels.cache` and posts. Throws if the channel isn't cached; callers catch and log.
 - `src/commands/cytube.ts` — `SlashCommandBuilder` def + `execute(…)` handler for `/cytube` + `handleButton(…)` for the unsubscribe-all confirmation button. Subcommands restricted to members with `ManageGuild`. Slash command options use `room:` for the CyTube room and `channel:` for the Discord channel.
 - `src/interaction-router.ts` — single dispatch point. Routes chat-input commands and button interactions whose custom ID starts with `cytube:`. Wrapped in a top-level try/catch — discord.js emits an 'error' event on the Client when an interaction handler throws (most common cause: the 3-second interaction token expired before we replied), and an unhandled 'error' event would crash the process. Errors here are logged and swallowed.
@@ -78,6 +78,25 @@ When a CyTube client fires `changeMedia`:
 - **`src/config/index.ts` calls `dotenv.config()` at import.** Anything that reads env vars should import `env` from there so dotenv is guaranteed to have run.
 - **The cache lookup in `sendMessage` only works because calls happen after `ClientReady`** — moving them earlier returns `undefined`. The Discord client has only `GatewayIntentBits.Guilds`; new features needing message content / members require additional intents AND matching changes in the Discord Developer Portal.
 - **Slash command registration is a separate one-time concern.** The bot runtime doesn't register slash commands; `pnpm deploy-commands` does. The deploy workflow runs it automatically on push to `main`, so post-merge you don't need to do anything. For local pre-merge testing, run `pnpm deploy-commands` yourself.
+
+## CyTube connection supervision
+
+The CyTube socket is supervised, because a silent drop once cost six months of downtime (DW-499): the bot kept its Discord gateway connection and reported `Up`, so the only symptom was messages that never arrived.
+
+**`cytube-client` already enables socket.io reconnection** (`connect()` defaults `reconnection: true`), so the gap was never a missing retry — it was that nothing observed or supervised that retry, and socket.io alone cannot recover every failure mode:
+
+- It re-dials the **same** socket server URL forever. CyTube hands out a per-room server via `/socketconfig/<room>.json`, so if a room moves to a different node, socket.io's retry can never succeed. Only a full rebuild through `CytubeClient.connect()` re-fetches that config.
+- On `io server disconnect` it does not retry at all.
+
+Three layers, each covering what the one above misses:
+
+1. **Socket lifecycle handlers** (`connect`, `disconnect`, `connect_error`, `error`, `reconnect_failed`) bound to the raw `instance.socket`. We bind there rather than through `instance.on()` because cytube-client's wrapper drops extra callback args, discarding the disconnect reason and error object. Every handler logs — the outage was invisible precisely because none of this was observed.
+2. **Targeted rebuilds** for the cases socket.io won't handle: `io server disconnect` and `reconnect_failed`.
+3. **A watchdog** (`WATCHDOG_INTERVAL_MS`, 60s) that audits every entry and rebuilds any socket disconnected longer than `STALE_AFTER_MS` (5 min). This is the backstop: it ignores socket.io's internal state machine and just asks "has this been down too long?", so it catches wedged clients whose failure mode we haven't seen yet.
+
+A rebuild means `retire()` (close, best-effort, then **delete from the map**) followed by a jittered exponential backoff capped at `REBUILD_MAX_MS`. Deleting the entry is load-bearing: the original bug was that a dead instance stayed in the map, so `reconcile()`'s `if (!entries.has(ch))` guard skipped it permanently and nothing short of a process restart recovered. **Treat the map as live connections only.**
+
+Backoff resets on the `connect` event — reaching a usable connection, not merely attempting one. Pending rebuilds are tracked in `pendingRebuilds` so `shutdown()` can cancel them and so a queued rebuild can't race `reconcile()` into a second client for the same room; a rebuild that fires after its room was unsubscribed is abandoned.
 
 ## Deployment
 
